@@ -36,6 +36,12 @@ body {
   padding: 14px;
 }
 
+.top-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
 .kicker {
   margin: 0;
   font-size: 12px;
@@ -56,6 +62,14 @@ button {
   border: 0;
   border-radius: 10px;
   font: inherit;
+}
+
+.ghost {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--text);
+  border: 1px solid var(--border);
+  width: auto;
+  margin-top: 0;
 }
 
 input {
@@ -143,6 +157,13 @@ button:disabled {
 .status {
   margin: 10px 0 0;
   color: var(--muted);
+}
+
+.version {
+  margin: 0;
+  color: #9fb0bc;
+  font-size: 12px;
+  text-align: center;
 }
 
 @media (max-width: 700px) {

@@ -5,6 +5,7 @@ const gameView = document.getElementById("gameView");
 const nameInput = document.getElementById("nameInput");
 const joinBtn = document.getElementById("joinBtn");
 const joinStatus = document.getElementById("joinStatus");
+const leaveBtn = document.getElementById("leaveBtn");
 
 const scoreBoard = document.getElementById("scoreBoard");
 const readyBtn = document.getElementById("readyBtn");
@@ -111,7 +112,9 @@ function applyState(state) {
 async function fetchState() {
   if (!joined) return;
   try {
-    const res = await fetch(`/api/state?roomId=${encodeURIComponent(ROOM_ID)}`);
+    const res = await fetch(
+      `/api/state?roomId=${encodeURIComponent(ROOM_ID)}&playerName=${encodeURIComponent(playerName)}`
+    );
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Durum alinamadi.");
     applyState(data);
@@ -156,6 +159,28 @@ async function joinGame() {
   }
 }
 
+async function leaveGame() {
+  if (!joined || !playerName) return;
+  try {
+    await fetch("/api/leave", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ roomId: ROOM_ID, playerName }),
+    });
+  } catch {
+    // no-op
+  }
+
+  joined = false;
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+  gameView.classList.add("hidden");
+  joinView.classList.remove("hidden");
+  setJoinStatus("Rakibini bekle.");
+}
+
 async function markReady() {
   if (!joined) return;
   try {
@@ -198,5 +223,14 @@ async function submitAnswer(event) {
 }
 
 joinBtn.addEventListener("click", joinGame);
+leaveBtn.addEventListener("click", leaveGame);
 readyBtn.addEventListener("click", markReady);
 answerForm.addEventListener("submit", submitAnswer);
+
+window.addEventListener("beforeunload", () => {
+  if (!joined || !playerName) return;
+  const payload = JSON.stringify({ roomId: ROOM_ID, playerName });
+  navigator.sendBeacon("/api/leave", payload);
+});
+
+// Bilerek auto-join yok: oyuncu her giriste Hazirim ile oyuna girer.
