@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quiz VS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Bebas+Neue&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="hero">
+        <p class="kicker">QUIZ VS</p>
+        <h1>Quiz Gecesi</h1>
+      </header>
+
+      <section id="joinView" class="panel">
+        <input id="nameInput" placeholder="Adin" />
+        <button id="joinBtn" type="button">Hazirim</button>
+        <p id="joinStatus" class="status">Rakibini bekle.</p>
+      </section>
+
+      <section id="gameView" class="panel hidden">
+        <div class="toprow">
+          <div id="scoreBoard" class="scores"></div>
+          <div id="countdown" class="countdown">-</div>
+        </div>
+
+        <button id="readyBtn" type="button">Hazir</button>
+
+        <div id="questionCard" class="question hidden">
+          <p id="questionText"></p>
+          <p id="commentText" class="comment"></p>
+        </div>
+
+        <form id="answerForm" class="answer-form" autocomplete="off">
+          <input id="answerInput" placeholder="Cevabin" />
+          <button type="submit">Gonder</button>
+        </form>
+
+        <p id="statusText" class="status"></p>
+      </section>
+    </main>
+
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>

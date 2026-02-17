@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: quiz-vs
+    env: python
+    plan: free
+    buildCommand: ""
+    startCommand: python3 app.py
+    healthCheckPath: /
+    envVars:
+      - key: MODEL
+        value: gemini-2.0-flash
+      - key: MODEL_FALLBACKS
+        value: gemini-2.0-flash,gemini-1.5-flash-latest,gemini-1.5-flash
+      - key: GEMINI_API_KEY
+        sync: false
