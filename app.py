@@ -39,6 +39,7 @@ MODEL_CANDIDATES = [
 ]
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 PRESENCE_TIMEOUT_MS = 15000
+TURN_TIMEOUT_MS = 10000
 
 SYSTEM_PROMPT = """You are an AI quiz show host for a social, party-style general knowledge game.
 
@@ -201,6 +202,18 @@ def reconcile_room_state(room: dict) -> None:
     room["countdown_end_ms"] = 0
     room["generating"] = False
     add_event(room, "host", "Oyunculardan biri cikti. Tur sifirlandi, tekrar Hazir basin.")
+    return
+
+  if room["phase"] == "question" and room["current_question"]:
+    q = room["current_question"]
+    expected_player = q.get("expected_player", "")
+    deadline_ms = int(q.get("turn_deadline_ms", 0))
+    if expected_player and deadline_ms and now_ms >= deadline_ms:
+      add_event(room, "host", f"{expected_player} sureyi doldurdu. Soru pas, yeni soru geliyor.")
+      room["phase"] = "countdown"
+      room["countdown_end_ms"] = now_ms + 3000
+      room["current_question"] = None
+      room["generating"] = False
 
 
 def add_event(room: dict, role: str, text: str) -> None:
@@ -271,6 +284,7 @@ def ensure_round_question(room_id: str) -> None:
       "winner": "",
       "expected_player": "",
       "attempt_order": [],
+      "turn_deadline_ms": 0,
     }
     room["question_categories"].append(room["current_question"]["category"])
     room["question_categories"] = room["question_categories"][-12:]
@@ -511,6 +525,7 @@ class Handler(BaseHTTPRequestHandler):
 
           if next_player and next_player not in attempts:
             active_q["expected_player"] = next_player
+            active_q["turn_deadline_ms"] = int(time.time() * 1000) + TURN_TIMEOUT_MS
             add_event(room, "host", f"{player} bilemedi. Sira {next_player} oyuncusunda.")
           else:
             add_event(room, "host", "Iki taraf da bilemedi. Soru pas, yeni soru geliyor.")
