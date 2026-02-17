@@ -38,6 +38,7 @@ MODEL_CANDIDATES = [
   if m.strip()
 ]
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+PRESENCE_TIMEOUT_MS = 15000
 
 SYSTEM_PROMPT = """You are an AI quiz show host for a social, party-style general knowledge game.
 
@@ -158,6 +159,7 @@ def get_room(room_id: str) -> dict:
   if room_id not in ROOMS:
     ROOMS[room_id] = {
       "players": {},
+      "presence": {},
       "ready": set(),
       "phase": "lobby",
       "countdown_end_ms": 0,
@@ -169,6 +171,36 @@ def get_room(room_id: str) -> dict:
       "question_categories": [],
     }
   return ROOMS[room_id]
+
+
+def active_players(room: dict) -> list:
+  now_ms = int(time.time() * 1000)
+  return [
+    name
+    for name, last_seen in room["presence"].items()
+    if now_ms - last_seen <= PRESENCE_TIMEOUT_MS and name in room["players"]
+  ]
+
+
+def mark_presence(room: dict, player: str) -> None:
+  room["presence"][player] = int(time.time() * 1000)
+
+
+def reconcile_room_state(room: dict) -> None:
+  now_ms = int(time.time() * 1000)
+  for name, last_seen in list(room["presence"].items()):
+    if now_ms - last_seen > PRESENCE_TIMEOUT_MS:
+      room["presence"].pop(name, None)
+      room["ready"].discard(name)
+
+  active = active_players(room)
+  if room["phase"] in ["countdown", "question", "round_end"] and len(active) < 2:
+    room["phase"] = "lobby"
+    room["current_question"] = None
+    room["ready"] = set()
+    room["countdown_end_ms"] = 0
+    room["generating"] = False
+    add_event(room, "host", "Oyunculardan biri cikti. Tur sifirlandi, tekrar Hazir basin.")
 
 
 def add_event(room: dict, role: str, text: str) -> None:
@@ -188,7 +220,7 @@ def start_countdown(room: dict) -> None:
 
 
 def can_start_round(room: dict) -> bool:
-  player_names = list(room["players"].keys())
+  player_names = active_players(room)
   return len(player_names) >= 2 and all(name in room["ready"] for name in player_names)
 
 
@@ -237,6 +269,8 @@ def ensure_round_question(room_id: str) -> None:
       "hostComment": (question_obj.get("hostComment") or "Hadi bakalim.").strip(),
       "category": (question_obj.get("category") or "Karisik").strip(),
       "winner": "",
+      "expected_player": "",
+      "attempt_order": [],
     }
     room["question_categories"].append(room["current_question"]["category"])
     room["question_categories"] = room["question_categories"][-12:]
@@ -331,14 +365,22 @@ class Handler(BaseHTTPRequestHandler):
     if parsed.path == "/api/state":
       params = parse.parse_qs(parsed.query)
       room_id = (params.get("roomId", [""])[0] or "").strip().lower()
+      player = (params.get("playerName", [""])[0] or "").strip()
       if not room_id:
         self._send_json(400, {"error": "roomId gerekli"})
         return
+
+      with ROOM_LOCK:
+        room = get_room(room_id)
+        if player and player in room["players"]:
+          mark_presence(room, player)
+        reconcile_room_state(room)
 
       ensure_round_question(room_id)
 
       with ROOM_LOCK:
         room = get_room(room_id)
+        reconcile_room_state(room)
         self._send_json(200, room_snapshot(room))
       return
 
@@ -372,6 +414,21 @@ class Handler(BaseHTTPRequestHandler):
         if player not in room["players"]:
           room["players"][player] = 0
           add_event(room, "system", f"{player} odaya girdi.")
+        mark_presence(room, player)
+        reconcile_room_state(room)
+        self._send_json(200, room_snapshot(room))
+      return
+
+    if self.path == "/api/leave":
+      player = (payload.get("playerName") or "").strip()
+      if not player:
+        self._send_json(400, {"error": "playerName gerekli"})
+        return
+      with ROOM_LOCK:
+        room = get_room(room_id)
+        room["presence"].pop(player, None)
+        room["ready"].discard(player)
+        reconcile_room_state(room)
         self._send_json(200, room_snapshot(room))
       return
 
@@ -384,6 +441,8 @@ class Handler(BaseHTTPRequestHandler):
         room = get_room(room_id)
         if player not in room["players"]:
           room["players"][player] = 0
+        mark_presence(room, player)
+        reconcile_room_state(room)
         if room["phase"] not in ["lobby", "round_end"]:
           self._send_json(409, {"error": "Su an hazirlanma asamasi degil", "state": room_snapshot(room)})
           return
@@ -410,16 +469,23 @@ class Handler(BaseHTTPRequestHandler):
 
       with ROOM_LOCK:
         room = get_room(room_id)
+        mark_presence(room, player)
+        reconcile_room_state(room)
         if room["phase"] != "question" or not room["current_question"]:
           self._send_json(409, {"error": "Su an soru asamasi degil", "state": room_snapshot(room)})
           return
-        question = room["current_question"]["question"]
-        canonical = room["current_question"]["answer"]
+        active_q = room["current_question"]
+        expected_player = active_q.get("expected_player", "")
+        if expected_player and expected_player != player:
+          self._send_json(409, {"error": f"Sira {expected_player} oyuncusunda.", "state": room_snapshot(room)})
+          return
+        if not expected_player:
+          active_q["expected_player"] = player
 
-      correct = evaluate_answer(question, canonical, answer_text)
+        question = active_q["question"]
+        canonical = active_q["answer"]
+        correct = evaluate_answer(question, canonical, answer_text)
 
-      with ROOM_LOCK:
-        room = get_room(room_id)
         add_event(room, "system", f"{player}: {answer_text}")
 
         if room["phase"] != "question" or not room["current_question"]:
@@ -428,7 +494,7 @@ class Handler(BaseHTTPRequestHandler):
 
         if correct:
           room["players"][player] = room["players"].get(player, 0) + 1
-          room["current_question"]["winner"] = player
+          active_q["winner"] = player
           room["phase"] = "round_end"
           score_line = " | ".join([f"{name}: {score}" for name, score in room["players"].items()])
           add_event(room, "host", f"Dogru! Turu {player} aldi. (+1 puan)")
@@ -436,7 +502,22 @@ class Handler(BaseHTTPRequestHandler):
           add_event(room, "host", "Yeni tur icin herkes yeniden Hazir'a bassin.")
           room["ready"] = set()
         else:
-          add_event(room, "host", f"{player}, olmadi. Devam.")
+          attempts = active_q.setdefault("attempt_order", [])
+          if player not in attempts:
+            attempts.append(player)
+
+          other_players = [name for name in active_players(room) if name != player]
+          next_player = other_players[0] if other_players else ""
+
+          if next_player and next_player not in attempts:
+            active_q["expected_player"] = next_player
+            add_event(room, "host", f"{player} bilemedi. Sira {next_player} oyuncusunda.")
+          else:
+            add_event(room, "host", "Iki taraf da bilemedi. Soru pas, yeni soru geliyor.")
+            room["phase"] = "countdown"
+            room["countdown_end_ms"] = int(time.time() * 1000) + 3000
+            room["current_question"] = None
+            room["generating"] = False
 
         self._send_json(200, room_snapshot(room))
       return
