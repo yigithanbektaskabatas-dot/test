@@ -8,6 +8,7 @@ const joinStatus = document.getElementById("joinStatus");
 const leaveBtn = document.getElementById("leaveBtn");
 
 const scoreBoard = document.getElementById("scoreBoard");
+const categoryBadge = document.getElementById("categoryBadge");
 const readyBtn = document.getElementById("readyBtn");
 const countdown = document.getElementById("countdown");
 const questionCard = document.getElementById("questionCard");
@@ -71,6 +72,8 @@ function renderScores(scores) {
 function applyState(state) {
   renderScores(state.scores || []);
   const hostMsg = latestHostMessage(state.events || []);
+  const currentCategory = (state.question && state.question.category) || "KARIŞIK";
+  categoryBadge.textContent = String(currentCategory).toUpperCase();
 
   if (state.phase === "lobby") {
     countdown.textContent = "-";

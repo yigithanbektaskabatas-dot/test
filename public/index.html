@@ -7,51 +7,50 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Bebas+Neue&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Baloo+2:wght@600;700&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <main class="app">
-      <header class="hero">
-        <p class="kicker">QUIZ VS</p>
+      <section id="joinView" class="join-card">
+        <p class="brand-mini">QUIZ VS</p>
         <h1>Quiz Gecesi</h1>
-      </header>
-
-      <section id="joinView" class="panel">
-        <input id="nameInput" placeholder="Adin" />
+        <input id="nameInput" placeholder="Adın" />
         <button id="joinBtn" type="button">Hazırım</button>
         <p id="joinStatus" class="status">Rakibini bekle.</p>
       </section>
 
-      <section id="gameView" class="panel hidden">
-        <div class="top-actions">
-          <button id="leaveBtn" type="button" class="ghost">Oyundan Cik</button>
-        </div>
-        <div class="toprow">
-          <div id="scoreBoard" class="scores"></div>
-          <div id="countdown" class="countdown">-</div>
-        </div>
+      <section id="gameView" class="game-shell hidden">
+        <header class="quiz-topbar">
+          <div id="categoryBadge" class="category-badge">KARIŞIK</div>
+          <div class="top-controls">
+            <div id="countdown" class="timer-pill">-</div>
+            <button id="leaveBtn" type="button" class="ghost">Çık</button>
+          </div>
+        </header>
 
-        <button id="readyBtn" type="button">Hazır</button>
+        <section id="scoreBoard" class="scores"></section>
 
-        <div id="questionCard" class="question hidden">
-          <p id="questionText"></p>
+        <button id="readyBtn" type="button" class="ready-btn">Hazır</button>
+
+        <article id="questionCard" class="question-card hidden">
+          <p id="questionText" class="question-text"></p>
           <p id="commentText" class="comment"></p>
-        </div>
+        </article>
 
         <form id="answerForm" class="answer-form" autocomplete="off">
-          <input id="answerInput" placeholder="Cevabin" />
-          <button type="submit">Gonder</button>
+          <input id="answerInput" placeholder="Cevabın" />
+          <button type="submit">Gönder</button>
         </form>
 
         <p id="statusText" class="status"></p>
       </section>
 
-      <p class="version">Surum: 2026-02-17-join-leave-v2</p>
+      <p class="version">Sürüm: 2026-02-18-ui-v3</p>
     </main>
 
-    <script type="module" src="/main.js?v=20260217b"></script>
+    <script type="module" src="/main.js?v=20260218c"></script>
   </body>
 </html>
