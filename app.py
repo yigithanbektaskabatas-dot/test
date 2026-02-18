@@ -41,6 +41,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 PRESENCE_TIMEOUT_MS = 15000
 TURN_TIMEOUT_MS = 10000
 QUESTION_TIMEOUT_MS = 10000
+QUESTION_GENERATION_RETRIES = 6
 
 SYSTEM_PROMPT = """You are an AI quiz show host for a social, party-style general knowledge game.
 
@@ -171,6 +172,8 @@ def get_room(room_id: str) -> dict:
       "seq": 0,
       "generating": False,
       "question_categories": [],
+      "question_fingerprints": [],
+      "recent_questions": [],
     }
   return ROOMS[room_id]
 
@@ -251,21 +254,41 @@ def can_start_round(room: dict) -> bool:
 
 def generate_question_payload(room: dict) -> dict:
   recent = ", ".join(room["question_categories"][-4:]) or "(yok)"
-  prompt = (
-    "Yeni bir quiz sorusu uret. Sadece JSON don. Anahtarlar: "
-    "category, question, answer, hostComment. question tek soru olmali. "
-    "hostComment tek cumle ve kisa olmali. Son kategoriler: "
-    f"{recent}."
-  )
-  raw = model_request(prompt, response_mime_type="application/json", temperature=0.9)
-  data = parse_json_text(raw)
-  if isinstance(data, list):
-    data = data[0] if data and isinstance(data[0], dict) else {}
-  if not isinstance(data, dict):
-    data = {}
-  if not data.get("question") or not data.get("answer"):
-    raise RuntimeError("Gecersiz soru uretimi")
-  return data
+  banned_fps = set(room.get("question_fingerprints", []))
+  recent_questions = room.get("recent_questions", [])[-8:]
+  recent_text = " | ".join(recent_questions) if recent_questions else "(yok)"
+
+  for _ in range(QUESTION_GENERATION_RETRIES):
+    prompt = (
+      "Yeni bir quiz sorusu uret. Sadece JSON don. Anahtarlar: "
+      "category, question, answer, hostComment. question tek soru olmali. "
+      "hostComment tek cumle ve kisa olmali. "
+      "ASLA asagidaki sorulara benzer veya ayni soru uretme: "
+      f"{recent_text}. Son kategoriler: {recent}."
+    )
+    raw = model_request(prompt, response_mime_type="application/json", temperature=0.9)
+    data = parse_json_text(raw)
+    if isinstance(data, list):
+      data = data[0] if data and isinstance(data[0], dict) else {}
+    if not isinstance(data, dict):
+      data = {}
+    if not data.get("question") or not data.get("answer"):
+      continue
+
+    q_text = str(data["question"]).strip()
+    fingerprint = normalize_text(q_text)
+    if not fingerprint or fingerprint in banned_fps:
+      continue
+
+    return data
+
+  # Fallback: oyun akisi durmasin.
+  return {
+    "category": "Genel Kultur",
+    "question": "Bir haftada kac gun vardir?",
+    "answer": "7",
+    "hostComment": "Bu sefer hizli gir.",
+  }
 
 
 def ensure_round_question(room_id: str) -> None:
@@ -292,8 +315,16 @@ def ensure_round_question(room_id: str) -> None:
       return
 
     room["phase"] = "question"
+    q_text = question_obj["question"].strip()
+    q_fp = normalize_text(q_text)
+    if q_fp:
+      room["question_fingerprints"].append(q_fp)
+      room["question_fingerprints"] = room["question_fingerprints"][-60:]
+    room["recent_questions"].append(q_text)
+    room["recent_questions"] = room["recent_questions"][-20:]
+
     room["current_question"] = {
-      "question": question_obj["question"].strip(),
+      "question": q_text,
       "answer": question_obj["answer"].strip(),
       "hostComment": (question_obj.get("hostComment") or "Hadi bakalim.").strip(),
       "category": (question_obj.get("category") or "Karisik").strip(),
