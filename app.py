@@ -259,6 +259,10 @@ def generate_question_payload(room: dict) -> dict:
   )
   raw = model_request(prompt, response_mime_type="application/json", temperature=0.9)
   data = parse_json_text(raw)
+  if isinstance(data, list):
+    data = data[0] if data and isinstance(data[0], dict) else {}
+  if not isinstance(data, dict):
+    data = {}
   if not data.get("question") or not data.get("answer"):
     raise RuntimeError("Gecersiz soru uretimi")
   return data
@@ -323,6 +327,10 @@ def evaluate_answer(question: str, canonical_answer: str, player_answer: str) ->
   try:
     raw = model_request(judge_prompt, response_mime_type="application/json", temperature=0.1)
     data = parse_json_text(raw)
+    if isinstance(data, list):
+      data = data[0] if data and isinstance(data[0], dict) else {}
+    if not isinstance(data, dict):
+      data = {}
     return bool(data.get("correct", False))
   except Exception:
     return False
