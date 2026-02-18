@@ -77,7 +77,7 @@ function applyState(state) {
     answerInput.disabled = true;
     answerBtn.disabled = true;
     questionCard.classList.add("hidden");
-    setStatus("Hazir. Geri sayim basladi.");
+    setStatus("Hazır. Geri sayım başladı.");
   }
 
   if (state.phase === "question") {
@@ -105,7 +105,7 @@ function applyState(state) {
         ? `Kazanan: ${state.question.winner}`
         : "Tur bitti.";
     }
-    setStatus("Yeni tur icin Hazir bas.");
+    setStatus("Yeni tur için Hazır bas.");
   }
 }
 
@@ -191,7 +191,7 @@ async function markReady() {
       body: JSON.stringify({ roomId: ROOM_ID, playerName }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Hazir olmadi.");
+    if (!res.ok) throw new Error(data.error || "Hazır olmadı.");
     applyState(data);
   } catch (err) {
     setStatus(`Hata: ${err.message}`);
@@ -233,4 +233,4 @@ window.addEventListener("beforeunload", () => {
   navigator.sendBeacon("/api/leave", payload);
 });
 
-// Bilerek auto-join yok: oyuncu her giriste Hazirim ile oyuna girer.
+// Bilerek auto-join yok: oyuncu her girişte Hazırım ile oyuna girer.

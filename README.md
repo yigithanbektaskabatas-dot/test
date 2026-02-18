@@ -29,11 +29,11 @@ Bu proje icin online ortamda onerilen yol Render'dir. (`app.py` calisir)
 ## 2 Cihazla VS (Otomatik)
 
 1. İki cihaz da aynı linkten girsin (`http://<senin-ip>:3000`)
-2. Her oyuncu kendi adını yazıp `Hazirim` desin
-3. Oyun ekranında iki oyuncu da `Hazir` butonuna bassın
+2. Her oyuncu kendi adını yazıp `Hazırım` desin
+3. Oyun ekranında iki oyuncu da `Hazır` butonuna bassın
 4. Her iki cihazda 10'dan geri sayım başlar
 5. Soru gelince doğru cevabı ilk veren turu alır (+1 puan)
-6. Sonraki tur için iki taraf tekrar `Hazir` basar
+6. Sonraki tur için iki taraf tekrar `Hazır` basar
 
 ## Dosyalar
 
