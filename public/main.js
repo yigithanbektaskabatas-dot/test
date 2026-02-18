@@ -45,6 +45,15 @@ function setStatus(text) {
   statusText.textContent = text;
 }
 
+function latestHostMessage(events) {
+  if (!Array.isArray(events)) return "";
+  for (let i = events.length - 1; i >= 0; i -= 1) {
+    const evt = events[i];
+    if (evt && evt.role === "host" && evt.text) return evt.text;
+  }
+  return "";
+}
+
 function setJoinStatus(text) {
   joinStatus.textContent = text;
 }
@@ -61,6 +70,7 @@ function renderScores(scores) {
 
 function applyState(state) {
   renderScores(state.scores || []);
+  const hostMsg = latestHostMessage(state.events || []);
 
   if (state.phase === "lobby") {
     countdown.textContent = "-";
@@ -68,7 +78,7 @@ function applyState(state) {
     answerInput.disabled = true;
     answerBtn.disabled = true;
     questionCard.classList.add("hidden");
-    setStatus("Rakibini bekle.");
+    setStatus(hostMsg || "Rakibini bekle.");
   }
 
   if (state.phase === "countdown") {
@@ -77,7 +87,7 @@ function applyState(state) {
     answerInput.disabled = true;
     answerBtn.disabled = true;
     questionCard.classList.add("hidden");
-    setStatus("Hazır. Geri sayım başladı.");
+    setStatus(hostMsg || "Hazır. Geri sayım başladı.");
   }
 
   if (state.phase === "question") {
@@ -90,7 +100,7 @@ function applyState(state) {
       commentText.textContent = state.question.hostComment || "";
       questionCard.classList.remove("hidden");
     }
-    setStatus("Cevabi ilk dogru veren +1 puan.");
+    setStatus(hostMsg || "Cevabi ilk dogru veren +1 puan.");
   }
 
   if (state.phase === "round_end") {
@@ -105,7 +115,7 @@ function applyState(state) {
         ? `Kazanan: ${state.question.winner}`
         : "Tur bitti.";
     }
-    setStatus("Yeni tur için Hazır bas.");
+    setStatus(hostMsg || "Yeni tur için Hazır bas.");
   }
 }
 
