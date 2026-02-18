@@ -55,6 +55,12 @@ function latestHostMessage(events) {
   return "";
 }
 
+function extractRevealedAnswer(hostMsg) {
+  if (!hostMsg || !hostMsg.includes("Dogru cevap:")) return "";
+  const match = hostMsg.match(/Dogru cevap:\s*(.+?)(?:\.\s*3 saniye sonra yeni soru\.?|$)/i);
+  return match ? match[1].trim() : "";
+}
+
 function setJoinStatus(text) {
   joinStatus.textContent = text;
 }
@@ -72,6 +78,7 @@ function renderScores(scores) {
 function applyState(state) {
   renderScores(state.scores || []);
   const hostMsg = latestHostMessage(state.events || []);
+  const revealedAnswer = extractRevealedAnswer(hostMsg);
   const currentCategory = (state.question && state.question.category) || "KARIŞIK";
   categoryBadge.textContent = String(currentCategory).toUpperCase();
 
@@ -80,7 +87,13 @@ function applyState(state) {
     readyBtn.disabled = false;
     answerInput.disabled = true;
     answerBtn.disabled = true;
-    questionCard.classList.add("hidden");
+    if (revealedAnswer) {
+      questionText.textContent = `Doğru Cevap: ${revealedAnswer}`;
+      commentText.textContent = "Yeni soru hazırlanıyor...";
+      questionCard.classList.remove("hidden");
+    } else {
+      questionCard.classList.add("hidden");
+    }
     setStatus(hostMsg || "Rakibini bekle.");
   }
 
@@ -89,7 +102,13 @@ function applyState(state) {
     readyBtn.disabled = true;
     answerInput.disabled = true;
     answerBtn.disabled = true;
-    questionCard.classList.add("hidden");
+    if (revealedAnswer) {
+      questionText.textContent = `Doğru Cevap: ${revealedAnswer}`;
+      commentText.textContent = "3 saniye sonra yeni soru.";
+      questionCard.classList.remove("hidden");
+    } else {
+      questionCard.classList.add("hidden");
+    }
     setStatus(hostMsg || "Hazır. Geri sayım başladı.");
   }
 
