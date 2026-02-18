@@ -40,6 +40,7 @@ MODEL_CANDIDATES = [
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 PRESENCE_TIMEOUT_MS = 15000
 TURN_TIMEOUT_MS = 10000
+QUESTION_TIMEOUT_MS = 10000
 
 SYSTEM_PROMPT = """You are an AI quiz show host for a social, party-style general knowledge game.
 
@@ -206,10 +207,23 @@ def reconcile_room_state(room: dict) -> None:
 
   if room["phase"] == "question" and room["current_question"]:
     q = room["current_question"]
+    question_deadline_ms = int(q.get("question_deadline_ms", 0))
+    if question_deadline_ms and now_ms >= question_deadline_ms:
+      answer = q.get("answer", "")
+      add_event(room, "host", f"Sure bitti. Dogru cevap: {answer}")
+      add_event(room, "host", "3 saniye sonra yeni soru.")
+      room["phase"] = "countdown"
+      room["countdown_end_ms"] = now_ms + 3000
+      room["current_question"] = None
+      room["generating"] = False
+      return
+
     expected_player = q.get("expected_player", "")
     deadline_ms = int(q.get("turn_deadline_ms", 0))
     if expected_player and deadline_ms and now_ms >= deadline_ms:
-      add_event(room, "host", f"{expected_player} sureyi doldurdu. Soru pas, yeni soru geliyor.")
+      answer = q.get("answer", "")
+      add_event(room, "host", f"{expected_player} sureyi doldurdu. Dogru cevap: {answer}")
+      add_event(room, "host", "3 saniye sonra yeni soru.")
       room["phase"] = "countdown"
       room["countdown_end_ms"] = now_ms + 3000
       room["current_question"] = None
@@ -285,6 +299,7 @@ def ensure_round_question(room_id: str) -> None:
       "expected_player": "",
       "attempt_order": [],
       "turn_deadline_ms": 0,
+      "question_deadline_ms": int(time.time() * 1000) + QUESTION_TIMEOUT_MS,
     }
     room["question_categories"].append(room["current_question"]["category"])
     room["question_categories"] = room["question_categories"][-12:]
@@ -320,6 +335,10 @@ def room_snapshot(room: dict) -> dict:
   remaining = 0
   if room["phase"] == "countdown":
     remaining = max(0, int((room["countdown_end_ms"] - now_ms + 999) / 1000))
+  question_remaining = 0
+  if room["phase"] == "question" and room.get("current_question"):
+    deadline = int(room["current_question"].get("question_deadline_ms", 0))
+    question_remaining = max(0, int((deadline - now_ms + 999) / 1000))
 
   scores = [
     {"name": name, "score": score}
@@ -340,6 +359,7 @@ def room_snapshot(room: dict) -> dict:
     "phase": room["phase"],
     "round": room["round"],
     "countdown": remaining,
+    "questionCountdown": question_remaining,
     "scores": scores,
     "ready": sorted(list(room["ready"])),
     "events": room["events"],
@@ -489,6 +509,11 @@ class Handler(BaseHTTPRequestHandler):
           self._send_json(409, {"error": "Su an soru asamasi degil", "state": room_snapshot(room)})
           return
         active_q = room["current_question"]
+        attempts = active_q.setdefault("attempt_order", [])
+        if player in attempts:
+          self._send_json(409, {"error": "Yanlis cevap. Bu tur tekrar cevap veremezsin.", "state": room_snapshot(room)})
+          return
+
         expected_player = active_q.get("expected_player", "")
         if expected_player and expected_player != player:
           self._send_json(409, {"error": f"Sira {expected_player} oyuncusunda.", "state": room_snapshot(room)})
@@ -509,16 +534,17 @@ class Handler(BaseHTTPRequestHandler):
         if correct:
           room["players"][player] = room["players"].get(player, 0) + 1
           active_q["winner"] = player
-          room["phase"] = "round_end"
           score_line = " | ".join([f"{name}: {score}" for name, score in room["players"].items()])
           add_event(room, "host", f"Dogru! Turu {player} aldi. (+1 puan)")
           add_event(room, "host", f"Skor: {score_line}")
-          add_event(room, "host", "Yeni tur icin herkes yeniden Hazir'a bassin.")
-          room["ready"] = set()
+          add_event(room, "host", "3 saniye sonra yeni soru.")
+          room["phase"] = "countdown"
+          room["countdown_end_ms"] = int(time.time() * 1000) + 3000
+          room["current_question"] = None
+          room["generating"] = False
         else:
-          attempts = active_q.setdefault("attempt_order", [])
-          if player not in attempts:
-            attempts.append(player)
+          attempts.append(player)
+          add_event(room, "host", "Yanlis cevap.")
 
           other_players = [name for name in active_players(room) if name != player]
           next_player = other_players[0] if other_players else ""
@@ -528,7 +554,9 @@ class Handler(BaseHTTPRequestHandler):
             active_q["turn_deadline_ms"] = int(time.time() * 1000) + TURN_TIMEOUT_MS
             add_event(room, "host", f"{player} bilemedi. Sira {next_player} oyuncusunda.")
           else:
-            add_event(room, "host", "Iki taraf da bilemedi. Soru pas, yeni soru geliyor.")
+            answer = active_q.get("answer", "")
+            add_event(room, "host", f"Iki taraf da bilemedi. Dogru cevap: {answer}")
+            add_event(room, "host", "3 saniye sonra yeni soru.")
             room["phase"] = "countdown"
             room["countdown_end_ms"] = int(time.time() * 1000) + 3000
             room["current_question"] = None

@@ -81,7 +81,7 @@ function applyState(state) {
   }
 
   if (state.phase === "question") {
-    countdown.textContent = "0";
+    countdown.textContent = String(state.questionCountdown || 0);
     readyBtn.disabled = true;
     answerInput.disabled = false;
     answerBtn.disabled = false;
