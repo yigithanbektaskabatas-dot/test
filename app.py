@@ -210,8 +210,7 @@ def reconcile_room_state(room: dict) -> None:
     question_deadline_ms = int(q.get("question_deadline_ms", 0))
     if question_deadline_ms and now_ms >= question_deadline_ms:
       answer = q.get("answer", "")
-      add_event(room, "host", f"Sure bitti. Dogru cevap: {answer}")
-      add_event(room, "host", "3 saniye sonra yeni soru.")
+      add_event(room, "host", f"Sure bitti. Dogru cevap: {answer}. 3 saniye sonra yeni soru.")
       room["phase"] = "countdown"
       room["countdown_end_ms"] = now_ms + 3000
       room["current_question"] = None
@@ -222,8 +221,7 @@ def reconcile_room_state(room: dict) -> None:
     deadline_ms = int(q.get("turn_deadline_ms", 0))
     if expected_player and deadline_ms and now_ms >= deadline_ms:
       answer = q.get("answer", "")
-      add_event(room, "host", f"{expected_player} sureyi doldurdu. Dogru cevap: {answer}")
-      add_event(room, "host", "3 saniye sonra yeni soru.")
+      add_event(room, "host", f"{expected_player} sureyi doldurdu. Dogru cevap: {answer}. 3 saniye sonra yeni soru.")
       room["phase"] = "countdown"
       room["countdown_end_ms"] = now_ms + 3000
       room["current_question"] = None
@@ -555,8 +553,7 @@ class Handler(BaseHTTPRequestHandler):
             add_event(room, "host", f"{player} bilemedi. Sira {next_player} oyuncusunda.")
           else:
             answer = active_q.get("answer", "")
-            add_event(room, "host", f"Iki taraf da bilemedi. Dogru cevap: {answer}")
-            add_event(room, "host", "3 saniye sonra yeni soru.")
+            add_event(room, "host", f"Iki taraf da bilemedi. Dogru cevap: {answer}. 3 saniye sonra yeni soru.")
             room["phase"] = "countdown"
             room["countdown_end_ms"] = int(time.time() * 1000) + 3000
             room["current_question"] = None
